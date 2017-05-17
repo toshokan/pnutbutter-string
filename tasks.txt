@@ -1,0 +1,13 @@
+# This is an example task file
+# The format is name$number_of_seconds_between_reminders$message
+# Comments begin with '#'. Every line that isn't blank or a comment will
+# be parsed as a notification. This might not be what you want.
+#
+# Due to the way strings are interpreted by most shells, you probably want to
+# wrap the name and message in double quotes ("), especially if there are
+# special characters or punctuation
+
+# This will remind you to drink water every 20 minutes (1200 seconds)
+"Water"$1200$"You should probably drink some water!"
+# This will test that the program is working by spamming you every 5 seconds
+"Test"$5$"It's working. Feel free to remove or comment this line in tasks.txt"
