@@ -90,13 +90,15 @@ task* readTasks(char* filename, int* counter){
 void* printMessage(void* tp){
 	// Buffer for the next command to be stored in
 	char buf[300];
-	char* name = (*(task*)tp).name;
-	int freq = (*(task*)tp).wait_time;
-	char* reminder = (*(task*)tp).reminder;
+	task* t = (task*)tp;
+	char* name = t->name;
+	int freq = t->wait_time;
+	char* reminder = t->reminder;
 	// Repeatedly print reminders and sleep
 	while(1){
 		usleep(1000*1000*freq);
-		if((*(task*)tp).cancelled)
+		// Check for cancelled thread (not yet used)
+		if(t->cancelled)
 			return;
 		sprintf(buf, "notify-send %s %s", name, reminder);
 		system(buf);
