@@ -1,5 +1,5 @@
 default:
-	gcc -o reminder reminder.c -pthread
+	gcc -o pnutbutter-string pnutbutter-string.c -pthread
 
 clean:
-	rm reminder
+	rm pnutbutter-string 
