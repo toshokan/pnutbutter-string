@@ -49,7 +49,7 @@ int main(){
 		printf("There was an error setting up inotify, that functionality will not be available\n");
 	}
 	// Add reminder file to watch
-	iNotifyWatchDesc = inotify_add_watch( iNotifyFileDesc, "FILENAME", IN_MODIFY);		
+	iNotifyWatchDesc = inotify_add_watch( iNotifyFileDesc, FILENAME, IN_MODIFY);		
 	// Keep catching modifications forever
 	for(;;){
 		int i = 0;
@@ -59,6 +59,7 @@ int main(){
 			if (event->mask & IN_MODIFY){
 				// Placeholder. Re-reading tasks and preparing threads goes here FIXME
 				printf("Caught a modification\n");
+				break;
 			}
 			i += sizeof(struct inotify_event) + event->len;
 		}
