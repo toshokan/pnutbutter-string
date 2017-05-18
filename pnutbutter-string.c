@@ -34,8 +34,8 @@ int main(){
 		pthread_create(&thArr[i],NULL, printMessage, (void*)&ts[i]);
 	}
 
-	// Use blocking pthread_join to allow threads to loop independently
-	pthread_join(thArr[0], NULL);
+	// Suspend execution (block until signal)
+	pause();
 
 	// Free some dynamically allocated memory 
 	free(thArr);
