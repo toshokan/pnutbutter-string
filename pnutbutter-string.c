@@ -13,7 +13,6 @@
 typedef struct task {
 	char name[32];
 	int wait_time;
-	int cancelled;
 	char reminder[256];
 } task;
 
@@ -42,6 +41,7 @@ int main(){
 	int iNotifyFileDesc;
 	int iNotifyWatchDesc;
 	char iNotifyBuf[EVENT_BUF_LEN];
+	int modified = 0;
 
 	// Prepare for inotify file watch
 	iNotifyFileDesc = inotify_init();
@@ -57,14 +57,23 @@ int main(){
 		while ( i < numiNotifyEvents) {
 			struct inotify_event* event = (struct inotify_event*) &iNotifyBuf[i];
 			if (event->mask & IN_MODIFY){
-				// Placeholder. Re-reading tasks and preparing threads goes here FIXME
-				printf("Caught a modification\n");
-				break;
+				modified = 1;
 			}
 			i += sizeof(struct inotify_event) + event->len;
 		}
+		if(modified){
+			printf("Caught a modification to %s, reloading reminders\n", FILENAME);
+			for(int j = 0; j < counter; j++){
+				pthread_cancel(thArr[j]);
+			}
+			ts = readTasks(FILENAME, &counter);
+			printf("Tasks updated\n");
+			for(int j = 0; j < counter; j++){
+				pthread_create(&thArr[j], NULL, printMessage, (void*)&ts[j]);
+			}
+		}
 	}
-	// Romove the watch and close the file descriptor
+	// Remove the watch and close the file descriptor
 	inotify_rm_watch(iNotifyFileDesc,iNotifyWatchDesc);
 	close(iNotifyFileDesc);
 
@@ -105,7 +114,6 @@ task* readTasks(char* filename, int* counter){
 		strcpy(ts[pos].name, token);
 		token = strtok(NULL, "$");
 		ts[pos].wait_time = atoi(token);
-		ts[pos].cancelled = 0;
 		token = strtok(NULL, "$");
 		strcpy(ts[pos].reminder, token);
 		pos++;
@@ -129,11 +137,9 @@ void* printMessage(void* tp){
 	int freq = t->wait_time;
 	char* reminder = t->reminder;
 	// Repeatedly print reminders and sleep
-	while(1){
+	for(;;){
 		usleep(1000*1000*freq);
 		// Check for cancelled thread (not yet used)
-		if(t->cancelled)
-			return;
 		sprintf(buf, "notify-send %s %s", name, reminder);
 		system(buf);
 	}
