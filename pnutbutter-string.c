@@ -16,9 +16,15 @@ typedef struct task {
 	char reminder[256];
 } task;
 
-task* readTasks(char* filename, int* counter);
+task* ts;
+pthread_t* thArr;
+int* counter;
+char* filename;
+
+task* readTasks(char* filename);
 void* printMessage(void* name);
-void reloadTasks(task* ts, int* counter, char* filename, pthread_t* thArr);
+void reloadTasks(int n);
+void cleanup(int n);
 
 int main(){
 	// Quit if notify-send is not in $PATH
@@ -26,16 +32,24 @@ int main(){
 		printf("Unable to find notify-send (usually part of libnotify)\n");
 		exit(EXIT_FAILURE);
 	}
+
+	char fnbuf[255];
+	filename = fnbuf;
+	strncpy(filename, FILENAME, 255);
+	int count;
+	counter = &count;
+
+	signal(SIGUSR1, reloadTasks);
+	signal(SIGTERM, cleanup);
+	signal(SIGINT, cleanup);
 	
-	// Hold number of tasks found in file
-	int counter;
 	// Get pointer to array of tasks
-	task* ts = readTasks(FILENAME, &counter);
+	ts = readTasks(FILENAME);
 	// Allocate memory for an array of pthreads
-	pthread_t* thArr = malloc(counter*sizeof(pthread_t*));
+	thArr = malloc(*counter*sizeof(pthread_t*));
 	
 	// Create enough threads for all the reminders
-	for(int i = 0; i < counter; i++){
+	for(int i = 0; i < *counter; i++){
 		pthread_create(&thArr[i],NULL, printMessage, (void*)&ts[i]);
 	}
 
@@ -64,7 +78,7 @@ int main(){
 			i += sizeof(struct inotify_event) + event->len;
 		}
 		if(modified)
-			reloadTasks(ts, &counter, FILENAME, thArr);
+			reloadTasks(0);
 		
 	}
 	// Remove the watch and close the file descriptor
@@ -74,16 +88,15 @@ int main(){
 	// Suspend execution (block until signal) in cases where inotify failed
 	pause();
 
-	// Free some dynamically allocated memory 
-	free(thArr);
-	free(ts);
+	// Cleanup before quitting (though it is unlikely to ever reach here)
+	cleanup(0);
 }
 
 /*
  * Read tasks from filename and return a pointer to an array of tasks. Also 
  * maintain a count of how many reminders were loaded
  */
-task* readTasks(char* filename, int* counter){
+task* readTasks(char* filename2){
 	// Allocate enough memory for 50 tasks
 	task* ts = malloc(50*sizeof(task));
 	FILE *fp;
@@ -91,9 +104,9 @@ task* readTasks(char* filename, int* counter){
 	int len = 0;
 	int read = 0;
 	// Open file for reading and check for errors
-	fp = fopen(filename, "r");
+	fp = fopen(filename2, "r");
 	if (fp == NULL){
-		printf("I can't seem to find %s\nBailing out.\n", filename);
+		printf("I can't seem to find %s\nBailing out.\n", filename2);
 		exit(EXIT_FAILURE);
 	}
 
@@ -143,14 +156,30 @@ void* printMessage(void* tp){
  * Kill all threads in thArr, reload tasks from filename into ts, then restart
  * threads and update counter
  */
-void reloadTasks(task* ts, int* counter, char* filename, pthread_t* thArr){
+void reloadTasks(int n){
 	printf("Caught a modification to %s, reloading reminders\n", FILENAME);
 	for(int i = 0; i < *counter; i++){
 		pthread_cancel(thArr[i]);
 	}
-	ts = readTasks(filename, counter);
+	ts = readTasks(filename);
 	printf("Tasks updated\n");
 	for(int i = 0; i < *counter; i++){
 		pthread_create(&thArr[i], NULL, printMessage, (void*)&ts[i]);
 	}
+}
+
+/*
+ * Kill all currently running threads and free all dynamically allocated
+ * memory before quitting gracefully.
+ */
+void cleanup(int n){
+	printf("Caught termination/interruption signal, cleaning up\n");
+	for(int i = 0; i < *counter; i++){
+		pthread_cancel(thArr[i]);
+	}
+	printf("Killed %d threads.\n", *counter);
+	free(thArr);
+	free(ts);
+	printf("Goodbye!\n");
+	exit(0);
 }
