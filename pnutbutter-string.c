@@ -3,8 +3,12 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/inotify.h>
 
 #define FILENAME "tasks.txt"
+#define EVENT_SIZE (sizeof (struct inotify_event))
+#define EVENT_BUF_LEN (1024 * (EVENT_SIZE + 16))
 
 typedef struct task {
 	char name[32];
@@ -33,6 +37,35 @@ int main(){
 	for(int i = 0; i < counter; i++){
 		pthread_create(&thArr[i],NULL, printMessage, (void*)&ts[i]);
 	}
+
+	int numiNotifyEvents;
+	int iNotifyFileDesc;
+	int iNotifyWatchDesc;
+	char iNotifyBuf[EVENT_BUF_LEN];
+
+	// Prepare for inotify file watch
+	iNotifyFileDesc = inotify_init();
+	if (iNotifyFileDesc<0){
+		printf("There was an error setting up inotify, that functionality will not be available\n");
+	}
+	// Add reminder file to watch
+	iNotifyWatchDesc = inotify_add_watch( iNotifyFileDesc, "FILENAME", IN_MODIFY);		
+	// Keep catching modifications forever
+	for(;;){
+		int i = 0;
+		numiNotifyEvents = read( iNotifyFileDesc, iNotifyBuf, EVENT_BUF_LEN);
+		while ( i < numiNotifyEvents) {
+			struct inotify_event* event = (struct inotify_event*) &iNotifyBuf[i];
+			if (event->mask & IN_MODIFY){
+				// Placeholder. Re-reading tasks and preparing threads goes here FIXME
+				printf("Caught a modification\n");
+			}
+			i += sizeof(struct inotify_event) + event->len;
+		}
+	}
+	// Romove the watch and close the file descriptor
+	inotify_rm_watch(iNotifyFileDesc,iNotifyWatchDesc);
+	close(iNotifyFileDesc);
 
 	// Suspend execution (block until signal)
 	pause();
