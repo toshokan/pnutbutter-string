@@ -18,6 +18,7 @@ typedef struct task {
 
 task* readTasks(char* filename, int* counter);
 void* printMessage(void* name);
+void reloadTasks(task* ts, int* counter, char* filename, pthread_t* thArr);
 
 int main(){
 	// Quit if notify-send is not in $PATH
@@ -25,6 +26,7 @@ int main(){
 		printf("Unable to find notify-send (usually part of libnotify)\n");
 		exit(EXIT_FAILURE);
 	}
+	
 	// Hold number of tasks found in file
 	int counter;
 	// Get pointer to array of tasks
@@ -48,6 +50,7 @@ int main(){
 	if (iNotifyFileDesc<0){
 		printf("There was an error setting up inotify, that functionality will not be available\n");
 	}
+	
 	// Add reminder file to watch
 	iNotifyWatchDesc = inotify_add_watch( iNotifyFileDesc, FILENAME, IN_MODIFY);		
 	// Keep catching modifications forever
@@ -56,28 +59,19 @@ int main(){
 		numiNotifyEvents = read( iNotifyFileDesc, iNotifyBuf, EVENT_BUF_LEN);
 		while ( i < numiNotifyEvents) {
 			struct inotify_event* event = (struct inotify_event*) &iNotifyBuf[i];
-			if (event->mask & IN_MODIFY){
+			if (event->mask & IN_MODIFY)
 				modified = 1;
-			}
 			i += sizeof(struct inotify_event) + event->len;
 		}
-		if(modified){
-			printf("Caught a modification to %s, reloading reminders\n", FILENAME);
-			for(int j = 0; j < counter; j++){
-				pthread_cancel(thArr[j]);
-			}
-			ts = readTasks(FILENAME, &counter);
-			printf("Tasks updated\n");
-			for(int j = 0; j < counter; j++){
-				pthread_create(&thArr[j], NULL, printMessage, (void*)&ts[j]);
-			}
-		}
+		if(modified)
+			reloadTasks(ts, &counter, FILENAME, thArr);
+		
 	}
 	// Remove the watch and close the file descriptor
 	inotify_rm_watch(iNotifyFileDesc,iNotifyWatchDesc);
 	close(iNotifyFileDesc);
 
-	// Suspend execution (block until signal)
+	// Suspend execution (block until signal) in cases where inotify failed
 	pause();
 
 	// Free some dynamically allocated memory 
@@ -145,3 +139,18 @@ void* printMessage(void* tp){
 	}
 }
 
+/*
+ * Kill all threads in thArr, reload tasks from filename into ts, then restart
+ * threads and update counter
+ */
+void reloadTasks(task* ts, int* counter, char* filename, pthread_t* thArr){
+	printf("Caught a modification to %s, reloading reminders\n", FILENAME);
+	for(int i = 0; i < *counter; i++){
+		pthread_cancel(thArr[i]);
+	}
+	ts = readTasks(filename, counter);
+	printf("Tasks updated\n");
+	for(int i = 0; i < *counter; i++){
+		pthread_create(&thArr[i], NULL, printMessage, (void*)&ts[i]);
+	}
+}
