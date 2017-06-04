@@ -41,6 +41,7 @@ int main(){
 	int count;
 	counter = &count;
 
+	// Register signal handlers
 	signal(SIGUSR1, reloadTasks);
 	signal(SIGTERM, cleanup);
 	signal(SIGINT, cleanup);
@@ -68,14 +69,14 @@ int main(){
 	}
 	
 	// Add reminder file to watch
-	iNotifyWatchDesc = inotify_add_watch( iNotifyFileDesc, FILENAME, IN_MODIFY);		
+	iNotifyWatchDesc = inotify_add_watch( iNotifyFileDesc, FILENAME, IN_CLOSE_WRITE);		
 	// Keep catching modifications forever
 	for(;;){
 		int i = 0;
 		numiNotifyEvents = read( iNotifyFileDesc, iNotifyBuf, EVENT_BUF_LEN);
 		while ( i < numiNotifyEvents) {
 			struct inotify_event* event = (struct inotify_event*) &iNotifyBuf[i];
-			if (event->mask & IN_MODIFY)
+			if (event->mask & IN_CLOSE_WRITE)
 				modified = 1;
 			i += sizeof(struct inotify_event) + event->len;
 		}
@@ -148,7 +149,6 @@ void* printMessage(void* tp){
 	// Repeatedly print reminders and sleep
 	for(;;){
 		usleep(1000*1000*freq);
-		// Check for cancelled thread (not yet used)
 		sprintf(buf, "notify-send %s %s", name, reminder);
 		system(buf);
 	}
