@@ -16,12 +16,14 @@ typedef struct task {
 	char reminder[256];
 } task;
 
+
+// Use many global variables for signaling
 task* ts;
 pthread_t* thArr;
 int* counter;
 char* filename;
 
-task* readTasks(char* filename);
+task* readTasks();
 void* printMessage(void* name);
 void reloadTasks(int n);
 void cleanup(int n);
@@ -44,7 +46,7 @@ int main(){
 	signal(SIGINT, cleanup);
 	
 	// Get pointer to array of tasks
-	ts = readTasks(FILENAME);
+	ts = readTasks();
 	// Allocate memory for an array of pthreads
 	thArr = malloc(*counter*sizeof(pthread_t*));
 	
@@ -96,7 +98,7 @@ int main(){
  * Read tasks from filename and return a pointer to an array of tasks. Also 
  * maintain a count of how many reminders were loaded
  */
-task* readTasks(char* filename2){
+task* readTasks(){
 	// Allocate enough memory for 50 tasks
 	task* ts = malloc(50*sizeof(task));
 	FILE *fp;
@@ -104,9 +106,9 @@ task* readTasks(char* filename2){
 	int len = 0;
 	int read = 0;
 	// Open file for reading and check for errors
-	fp = fopen(filename2, "r");
+	fp = fopen(filename, "r");
 	if (fp == NULL){
-		printf("I can't seem to find %s\nBailing out.\n", filename2);
+		printf("I can't seem to find %s\nBailing out.\n", filename);
 		exit(EXIT_FAILURE);
 	}
 
